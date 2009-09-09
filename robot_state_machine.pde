@@ -6,8 +6,6 @@
 #define  LED_PIN          13
 
 // Servo settings
-#define  MAX_PULSE        2500
-#define  MIN_PULSE        500
 #define  RIGHT_STOPPED    1460
 #define  LEFT_STOPPED     1465
 
