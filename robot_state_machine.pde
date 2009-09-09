@@ -114,7 +114,7 @@ void loop()
   update_servos();
 }
 
-// Process with input from the robot's sensors
+// Process input from the robot's sensor(s)
 void handle_input()
 {
   handle_bump_sensor();
