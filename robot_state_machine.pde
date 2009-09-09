@@ -12,14 +12,16 @@
 #define  LEFT_STOPPED     1465
 
 // States
-#define  STOPPED  0
-#define  FORWARD  1
-#define  REVERSE  2
-#define  LEFT     3
-#define  RIGHT    4
+#define  STOPPED        0
+#define  FORWARD        1
+#define  REVERSE        2
+#define  LEFT           3
+#define  RIGHT          4
+#define  ENABLE_INPUT   5
+#define  DISABLE_INPUT  6
 
 // Switch debounce level
-#define  DEBOUNCE  5000
+#define  DEBOUNCE  7000
 
 // Current state
 int state = STOPPED;
@@ -41,8 +43,11 @@ unsigned long last_pulse_right = 0;
 // Debounce the switch
 int switch_integrator = 0;
 
+// Are we listening to inputs?
+boolean input_enabled = true;
+
 // The event schedule
-int schedule_times[SCHEDULE_SIZE];
+unsigned long schedule_times[SCHEDULE_SIZE];
 int schedule_states[SCHEDULE_SIZE];
 
 void setup()
@@ -86,9 +91,21 @@ void loop()
       left_speed = 100;
       right_speed = -100;
       break;
+      
+    case DISABLE_INPUT:
+      input_enabled = false;
+      break;
+    
+    case ENABLE_INPUT:
+      input_enabled = true;
+      break;
   }
   
-  handle_input();
+  if (input_enabled)
+  {
+    handle_input();
+  }
+  
   handle_schedule();
   update_servos();
 }
@@ -115,9 +132,11 @@ void handle_bump_sensor()
         state = FORWARD;
         break;
       case FORWARD:
-        state = REVERSE;
+        state = DISABLE_INPUT;
+        schedule_state_change(REVERSE, 100);
         schedule_state_change(LEFT, 5000);
-        schedule_state_change(FORWARD, 8000);
+        schedule_state_change(ENABLE_INPUT, 7000);
+        schedule_state_change(FORWARD, 7000);
         break;
     }
     switch_integrator = 0;
@@ -135,7 +154,7 @@ void handle_schedule()
 {
   for (int schedule_slot = 0; schedule_slot<SCHEDULE_SIZE; schedule_slot++)
   {
-    int schedule_time = schedule_times[schedule_slot];
+    unsigned long schedule_time = schedule_times[schedule_slot];
     if (schedule_time && millis() >= schedule_time)
     {
       int new_state = schedule_states[schedule_slot];
@@ -164,7 +183,7 @@ void schedule_state_change(int state_to_schedule, int time_in_the_future)
     delay(1000000);
   }
   
-  int schedule_at = millis() + time_in_the_future;
+  unsigned long schedule_at = millis() + time_in_the_future;
   schedule_times[schedule_slot] = schedule_at;
   schedule_states[schedule_slot] = state_to_schedule;
   
