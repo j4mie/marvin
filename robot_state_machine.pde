@@ -21,7 +21,7 @@
 #define  DISABLE_INPUT  6
 
 // Switch debounce level
-#define  DEBOUNCE  7000
+#define  DEBOUNCE_THRESHOLD  7000
 
 // Current state
 int state = STOPPED;
@@ -33,8 +33,8 @@ int state = STOPPED;
 #define  SCHEDULE_SIZE  50
 
 // Current motor speeds
-int left_speed = 100;
-int right_speed = 100;
+int left_speed = 0;
+int right_speed = 0;
 
 // Servo last pulses
 unsigned long last_pulse_left = 0;
@@ -50,10 +50,11 @@ boolean input_enabled = true;
 unsigned long schedule_times[SCHEDULE_SIZE];
 int schedule_states[SCHEDULE_SIZE];
 
+// Initialise the pins and serial port
 void setup()
 {
   Serial.begin(9600);
-  Serial.println("Debugging started");
+  Serial.println("Robot booting...");
   
   pinMode(SERVO_LEFT_PIN, OUTPUT);
   pinMode(SERVO_RIGHT_PIN, OUTPUT);
@@ -61,8 +62,11 @@ void setup()
   
   pinMode(BUMP_SENSOR_PIN, INPUT);
   digitalWrite(BUMP_SENSOR_PIN, HIGH); // Turn on pulldown resistor
+
+  Serial.println("Hello from your plastic pal who's fun to be with.");
 }
 
+// The main execution loop
 void loop()
 {
   switch(state)
@@ -110,27 +114,37 @@ void loop()
   update_servos();
 }
 
+// Process with input from the robot's sensors
 void handle_input()
 {
   handle_bump_sensor();
 }
 
+// Handle input from the bump sensor on the front of the robot
 void handle_bump_sensor()
 {
-  int switch_pressed = digitalRead(BUMP_SENSOR_PIN);
+  // Has the switch been pressed?
+  boolean switch_pressed = digitalRead(BUMP_SENSOR_PIN);
   
+  // If so, start incrementing the integrator
   if (switch_pressed)
   {
     switch_integrator++;
   }
   
-  if (switch_integrator > DEBOUNCE)
+  // If the threshold has been reached, change state
+  if (switch_integrator > DEBOUNCE_THRESHOLD)
   {
     switch(state)
     {
+      // If the robot is stopped (the initial state),
+      // start moving forward.
       case STOPPED:
         state = FORWARD;
         break;
+        
+      // If the robot is moving forward and the input sensor is
+      // triggered, start the "reverse and turn" behaviour
       case FORWARD:
         state = DISABLE_INPUT;
         schedule_state_change(REVERSE, 100);
@@ -139,22 +153,23 @@ void handle_bump_sensor()
         schedule_state_change(FORWARD, 7000);
         break;
     }
-    switch_integrator = 0;
-  }
-  
-  else if (switch_integrator > DEBOUNCE && state == FORWARD)
-  {
-    state = STOPPED;
+    
+    // Reset the switch integrator
     switch_integrator = 0;
   }
 }
 
-// Figure out whether any schedules events need to take place
+// Figure out whether any scheduled events need to take place
 void handle_schedule()
 {
+  // Check all the schedule slots
   for (int schedule_slot = 0; schedule_slot<SCHEDULE_SIZE; schedule_slot++)
   {
+    // Get the schedule time for this slot. This will be zero if
+    // the slot is empty.
     unsigned long schedule_time = schedule_times[schedule_slot];
+    
+    // Check if the event is due to take place now
     if (schedule_time && millis() >= schedule_time)
     {
       int new_state = schedule_states[schedule_slot];
@@ -179,6 +194,7 @@ void schedule_state_change(int state_to_schedule, int time_in_the_future)
   
   if (schedule_slot == SCHEDULE_SIZE) // Schedule is full!
   {
+    // Error
     digitalWrite(LED_PIN, HIGH);
     delay(1000000);
   }
@@ -194,6 +210,7 @@ void schedule_state_change(int state_to_schedule, int time_in_the_future)
   Serial.println(schedule_at);
 }
 
+// Send the pulses to drive the servos
 void update_servos()
 {
   if (millis() - last_pulse_left >= SERVO_PULSE_INTERVAL)
